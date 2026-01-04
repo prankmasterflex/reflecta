@@ -3,7 +3,11 @@
 import React, { useState } from 'react';
 import { SAMPLE_CONTROLS, RESPONSE_OPTIONS, type ControlResponse, type ResponseOption } from './controlsData';
 
-export default function AssessmentForm() {
+interface AssessmentFormProps {
+    onResponseChange?: (controlId: string, response: ResponseOption) => void;
+}
+
+export default function AssessmentForm({ onResponseChange }: AssessmentFormProps) {
     const [responses, setResponses] = useState<Record<string, ControlResponse>>({});
 
     const handleResponseChange = (controlId: string, response: ResponseOption) => {
@@ -14,6 +18,9 @@ export default function AssessmentForm() {
                 notes: prev[controlId]?.notes || ''
             }
         }));
+
+        // Notify parent
+        onResponseChange?.(controlId, response);
 
         // PostHog tracking
         if (typeof window !== 'undefined' && (window as any).posthog) {
@@ -84,8 +91,8 @@ export default function AssessmentForm() {
                             <div
                                 key={control.id}
                                 className={`bg-white rounded-lg border-2 transition-all duration-200 ${isAnswered
-                                        ? 'border-green-400 shadow-md'
-                                        : 'border-gray-200 shadow-sm hover:shadow-md'
+                                    ? 'border-green-400 shadow-md'
+                                    : 'border-gray-200 shadow-sm hover:shadow-md'
                                     }`}
                             >
                                 <div className="p-5 sm:p-6">
