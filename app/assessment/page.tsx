@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ResponseValue } from '@/types/scoring';
 import { calculateReadiness } from '@/lib/scoring';
 import { SAMPLE_CONTROLS } from '@/components/assessment/controlsData';
@@ -17,6 +17,42 @@ export default function AssessmentPage() {
     const readinessSummary = useMemo(() => {
         return calculateReadiness(SAMPLE_CONTROLS, responses);
     }, [responses]);
+
+    // Track scoring analytics (optional)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).posthog) {
+            const answeredCount = Array.from(responses.values()).filter(
+                (r) => r !== 'Unknown'
+            ).length;
+
+            // Only track if user has answered at least one control
+            if (answeredCount > 0) {
+                (window as any).posthog.capture('readiness_scored', {
+                    readiness_percent: readinessSummary.readinessPercent,
+                    gap_count: readinessSummary.gapCount,
+                    fully_met_count: readinessSummary.fullyMetCount,
+                    answered_count: answeredCount,
+                    total_controls: readinessSummary.totalControls,
+                    applicable_controls: readinessSummary.applicableControls,
+                });
+            }
+        }
+    }, [readinessSummary, responses]);
+
+    // Track assessment completion milestone
+    useEffect(() => {
+        const answeredCount = Array.from(responses.values()).filter(
+            (r) => r !== 'Unknown'
+        ).length;
+
+        if (answeredCount === readinessSummary.totalControls && typeof window !== 'undefined' && (window as any).posthog) {
+            (window as any).posthog.capture('assessment_completed', {
+                readiness_percent: readinessSummary.readinessPercent,
+                gap_count: readinessSummary.gapCount,
+                fully_met_count: readinessSummary.fullyMetCount,
+            });
+        }
+    }, [responses, readinessSummary]);
 
     // Handler for when a response button is clicked
     const handleResponseChange = (controlId: string, response: ResponseValue) => {
@@ -37,8 +73,8 @@ export default function AssessmentPage() {
                         <button
                             onClick={() => setActiveTab('assessment')}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'assessment'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             Assessment
@@ -46,8 +82,8 @@ export default function AssessmentPage() {
                         <button
                             onClick={() => setActiveTab('summary')}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'summary'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             Summary & Gaps

@@ -64,7 +64,12 @@ export function calculateReadiness(
     const gaps: Gap[] = [];
 
     controls.forEach((control) => {
-        const response = responses.get(control.id) || 'Unknown';
+        // CRITICAL FIX: Only process controls that have been explicitly answered
+        if (!responses.has(control.id)) {
+            return; // Skip unanswered controls entirely
+        }
+
+        const response = responses.get(control.id)!;
 
         // Skip Not Applicable controls from calculation
         if (response === 'Not Applicable') {
