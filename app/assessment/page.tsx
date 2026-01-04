@@ -1,20 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { usePostHog } from 'posthog-js/react'
 
 export default function AssessmentPage() {
     const posthog = usePostHog()
     const [isCompleted, setIsCompleted] = useState(false)
+    const eventSent = useRef(false)
 
     useEffect(() => {
-        if (posthog) {
-            posthog.capture('assessment_started', { entry_point: 'landing_page' })
+        if (posthog && !eventSent.current) {
+            posthog.capture('assessment_started', {
+                entry_point: 'landing_page'
+            })
+            eventSent.current = true
         }
     }, [posthog])
 
-    const handleComplete = () => {
+    const handleComplete = async () => {
         posthog.capture('assessment_completed', { status: 'completed' })
+        await new Promise(resolve => setTimeout(resolve, 300));
         setIsCompleted(true)
     }
 

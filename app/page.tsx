@@ -7,11 +7,15 @@ export default function Home() {
     const router = useRouter()
     const posthog = usePostHog()
 
-    const handleStartCheck = () => {
+    const handleStartCheck = async () => {
         posthog.capture('cta_clicked', {
             cta_name: 'start_readiness_check',
             page: 'landing'
         })
+
+        // Small delay to ensure event is sent before navigation
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         router.push('/assessment')
     }
 
