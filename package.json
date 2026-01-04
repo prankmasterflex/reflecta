@@ -1,0 +1,26 @@
+{
+  "name": "reflecta",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prankmasterflex/reflecta.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/prankmasterflex/reflecta/issues"
+  },
+  "homepage": "https://github.com/prankmasterflex/reflecta#readme",
+  "description": "",
+  "dependencies": {
+    "next": "^16.1.1",
+    "posthog-js": "^1.313.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  }
+}
