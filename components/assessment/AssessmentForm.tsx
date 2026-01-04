@@ -42,27 +42,27 @@ export default function AssessmentForm() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto px-4 py-4">
-                    <h1 className="text-2xl font-bold text-gray-900">CMMC Assessment</h1>
-                    <p className="text-sm text-gray-600 mt-1">Layer 1 - Control Assessment</p>
+            <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+                <div className="max-w-5xl mx-auto px-6 py-6">
+                    <h1 className="text-3xl font-bold text-gray-900">CMMC Assessment</h1>
+                    <p className="text-base text-gray-600 mt-1">Layer 1 - Control Assessment</p>
                 </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="bg-white border-b border-gray-200">
-                <div className="max-w-4xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">
+            <div className="bg-white border-b border-gray-200 shadow-sm">
+                <div className="max-w-5xl mx-auto px-6 py-5">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-base font-medium text-gray-900">
                             Progress: {answeredCount} of {totalControls} completed
                         </span>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-base font-medium text-gray-600">
                             {Math.round(progressPercentage)}%
                         </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="w-full bg-gray-200 rounded-full h-3">
                         <div
-                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                            className="bg-blue-600 h-3 rounded-full transition-all duration-300"
                             style={{ width: `${progressPercentage}%` }}
                         />
                     </div>
@@ -70,7 +70,7 @@ export default function AssessmentForm() {
             </div>
 
             {/* Assessment Form */}
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-5xl mx-auto px-6 py-8">
                 <div className="space-y-6">
                     {SAMPLE_CONTROLS.map((control) => {
                         const response = responses[control.id];
@@ -79,38 +79,36 @@ export default function AssessmentForm() {
                         return (
                             <div
                                 key={control.id}
-                                className={`bg-white rounded-lg shadow-sm border-2 transition-all ${isAnswered ? 'border-green-300' : 'border-gray-200'
+                                className={`bg-white rounded-xl shadow border-2 transition-all ${isAnswered ? 'border-green-400' : 'border-gray-200'
                                     }`}
                             >
-                                <div className="p-6">
+                                <div className="p-8">
                                     {/* Control Header */}
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                                    {control.id}
+                                    <div className="mb-6">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-800">
+                                                {control.id}
+                                            </span>
+                                            {isAnswered && (
+                                                <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-green-100 text-green-800">
+                                                    ✓ Answered
                                                 </span>
-                                                {isAnswered && (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-green-100 text-green-800">
-                                                        ✓ Answered
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <h3 className="text-lg font-semibold text-gray-900">
-                                                {control.title}
-                                            </h3>
-                                            <p className="text-sm text-gray-600 mt-2">
-                                                {control.requirement}
-                                            </p>
+                                            )}
                                         </div>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-3">
+                                            {control.title}
+                                        </h3>
+                                        <p className="text-base text-gray-700 leading-relaxed">
+                                            {control.requirement}
+                                        </p>
                                     </div>
 
                                     {/* Response Options */}
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                                    <div className="mb-6">
+                                        <label className="block text-base font-semibold text-gray-900 mb-4">
                                             Response *
                                         </label>
-                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                                             {RESPONSE_OPTIONS.map((option) => {
                                                 const isSelected = response?.response === option;
                                                 return (
@@ -118,9 +116,9 @@ export default function AssessmentForm() {
                                                         key={option}
                                                         type="button"
                                                         onClick={() => handleResponseChange(control.id, option)}
-                                                        className={`px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${isSelected
-                                                                ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                                                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                                                        className={`px-5 py-3 rounded-lg border-2 text-base font-medium transition-all ${isSelected
+                                                                ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm'
+                                                                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
                                                             }`}
                                                     >
                                                         {option}
@@ -134,17 +132,17 @@ export default function AssessmentForm() {
                                     <div>
                                         <label
                                             htmlFor={`notes-${control.id}`}
-                                            className="block text-sm font-medium text-gray-700 mb-2"
+                                            className="block text-base font-semibold text-gray-900 mb-3"
                                         >
                                             Notes (Optional)
                                         </label>
                                         <textarea
                                             id={`notes-${control.id}`}
-                                            rows={3}
+                                            rows={4}
                                             value={response?.notes || ''}
                                             onChange={(e) => handleNotesChange(control.id, e.target.value)}
                                             placeholder="Add any additional context, evidence, or observations..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
                                         />
                                     </div>
                                 </div>
@@ -154,14 +152,14 @@ export default function AssessmentForm() {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="mt-8 flex items-center justify-between p-6 bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div className="text-sm text-gray-600">
+                <div className="mt-8 flex items-center justify-between p-6 bg-white rounded-xl shadow border border-gray-200">
+                    <div className="text-base text-gray-700">
                         {answeredCount === totalControls ? (
-                            <span className="text-green-600 font-medium">
+                            <span className="text-green-600 font-semibold">
                                 ✓ All controls answered
                             </span>
                         ) : (
-                            <span>
+                            <span className="font-medium">
                                 {totalControls - answeredCount} control{totalControls - answeredCount !== 1 ? 's' : ''} remaining
                             </span>
                         )}
@@ -169,7 +167,7 @@ export default function AssessmentForm() {
                     <button
                         type="button"
                         disabled
-                        className="px-6 py-2.5 bg-gray-300 text-gray-500 rounded-lg font-medium cursor-not-allowed"
+                        className="px-8 py-3 bg-gray-300 text-gray-500 rounded-lg font-semibold cursor-not-allowed"
                         title="This button will be functional in a future chapter"
                     >
                         Continue (Placeholder)
