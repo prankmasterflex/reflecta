@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import posthog from 'posthog-js';
 import { ResponseValue } from '@/types/scoring';
 import { calculateReadiness } from '@/lib/scoring';
 import { SAMPLE_CONTROLS } from '@/components/assessment/controlsData';
 import AssessmentForm from '@/components/assessment/AssessmentForm';
 import { ReadinessSummaryCard } from '@/components/assessment/ReadinessSummary';
 import { GapsList } from '@/components/assessment/GapsList';
+import { FixPlan, Gap, FixPlanRequest } from '@/types/fixplan';
 
 export default function AssessmentPage() {
     // State for tracking responses
     const [responses, setResponses] = useState<Map<string, ResponseValue>>(new Map());
     const [activeTab, setActiveTab] = useState<'assessment' | 'summary'>('assessment');
+    const [fixPlan, setFixPlan] = useState<FixPlan | null>(null);
+    const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+    const [planError, setPlanError] = useState<string | null>(null);
 
     // Reactively calculate readiness whenever responses change
     const readinessSummary = useMemo(() => {
@@ -61,6 +66,67 @@ export default function AssessmentPage() {
             next.set(controlId, response);
             return next;
         });
+    };
+
+    const transformGapsForAPI = (currentSummary: typeof readinessSummary): Gap[] => {
+        return currentSummary.gaps.map(gap => ({
+            control_id: gap.controlId,
+            control_title: gap.title,
+            requirement: gap.title, // Use title as requirement for now as simplified in Gap interface
+            response: gap.response as 'No' | 'Partial' | 'Unknown'
+        }));
+    };
+
+    const generateFixPlan = async () => {
+        // Track button click
+        posthog.capture('fix_plan_button_clicked', {
+            gap_count: readinessSummary.gaps.length
+        });
+
+        setIsGeneratingPlan(true);
+        setPlanError(null);
+
+        // Pre-calculate apiGaps to use in tracking if needed before or inside try/catch blocks scope
+        const apiGaps = transformGapsForAPI(readinessSummary);
+
+        try {
+            const response = await fetch('/api/generate-fix-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    industry: 'Defense Contracting',
+                    scopeNote: 'Small contractor conducting CMMC Level 2 assessment',
+                    gaps: apiGaps
+                } as FixPlanRequest)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate fix plan');
+            }
+
+            const plan: FixPlan = await response.json();
+            setFixPlan(plan);
+
+            // Track successful generation
+            posthog.capture('fix_plan_generated', {
+                gap_count: apiGaps.length,
+                industry: 'Defense Contracting',
+                has_critical_gaps: apiGaps.some(g => g.response === 'No'),
+                timestamp: new Date().toISOString()
+            });
+        } catch (error) {
+            setPlanError('Unable to generate fix plan. Please try again.');
+            console.error('Fix plan error:', error);
+
+            // Track generation failure
+            posthog.capture('fix_plan_generation_failed', {
+                gap_count: apiGaps.length, // apiGaps is now available in scope
+                error_message: error instanceof Error ? error.message : 'Unknown error',
+                timestamp: new Date().toISOString()
+            });
+        } finally {
+            setIsGeneratingPlan(false);
+        }
     };
 
     return (
@@ -137,6 +203,90 @@ export default function AssessmentPage() {
                     <div className="space-y-6">
                         <ReadinessSummaryCard summary={readinessSummary} />
                         <GapsList gaps={readinessSummary.gaps} />
+
+                        {readinessSummary.gaps.length > 0 && (
+                            <div className="mt-8">
+                                <button
+                                    onClick={generateFixPlan}
+                                    disabled={isGeneratingPlan}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {isGeneratingPlan ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                                            Generating Fix Plan...
+                                        </>
+                                    ) : (
+                                        'Generate AI Remediation Plan'
+                                    )}
+                                </button>
+
+                                {planError && (
+                                    <div className="mt-4 bg-red-50 border border-red-200 rounded p-4 text-red-700">
+                                        {planError}
+                                    </div>
+                                )}
+
+                                {fixPlan && (
+                                    <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-4">AI Remediation Plan</h3>
+
+                                        <div className="mb-6">
+                                            <h4 className="font-semibold text-gray-900 mb-2">Readiness Summary</h4>
+                                            <ul className="list-disc pl-5 space-y-1">
+                                                {fixPlan.readiness_summary.map((item, i) => (
+                                                    <li key={i} className="text-gray-700">{item}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+
+                                        <div className="mb-6">
+                                            <h4 className="font-semibold text-gray-900 mb-2">Top Priorities</h4>
+                                            <div className="space-y-4">
+                                                {fixPlan.top_priorities.map((priority, i) => (
+                                                    <div key={i} className="border-l-4 border-blue-500 pl-4 py-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <span className="font-bold text-gray-800">{priority.control_id}</span>
+                                                            <span className={`text-xs px-2 py-1 rounded font-medium ${priority.estimated_effort === 'L' ? 'bg-red-100 text-red-800' :
+                                                                priority.estimated_effort === 'M' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-green-100 text-green-800'
+                                                                }`}>
+                                                                Effort: {priority.estimated_effort}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 mt-1 italic">{priority.why_it_matters}</p>
+                                                        <ul className="mt-2 list-disc pl-5 text-sm text-gray-700">
+                                                            {priority.what_to_do.map((action, j) => (
+                                                                <li key={j}>{action}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <div>
+                                                <h4 className="font-semibold text-gray-900 mb-2 text-green-700">Quick Wins (7 Days)</h4>
+                                                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                                                    {fixPlan.quick_wins_7_days.map((win, i) => (
+                                                        <li key={i}>{win}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-gray-900 mb-2 text-red-700">Audit Risks</h4>
+                                                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                                                    {fixPlan.audit_risk_notes.map((risk, i) => (
+                                                        <li key={i}>{risk}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
