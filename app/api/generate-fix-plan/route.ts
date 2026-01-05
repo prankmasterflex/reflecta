@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
 
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash-001',
-            systemInstruction: SYSTEM_PROMPT,
         });
 
         const userPrompt = `
@@ -76,7 +75,10 @@ Generate a remediation plan in JSON format with the following structure:
 `;
 
         console.log('[FixPlanAPI] Sending request to Gemini...');
-        const result = await model.generateContent(userPrompt);
+        const result = await model.generateContent([
+            SYSTEM_PROMPT,
+            userPrompt
+        ]);
 
         const responseText = result.response.text();
         console.log('[FixPlanAPI] Received response from Gemini. Length:', responseText.length);
