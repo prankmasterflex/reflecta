@@ -42,14 +42,19 @@ AI-powered remediation plan generator that transforms CMMC assessment gaps into 
 
 ### Environment Variables
 ```env
-GEMINI_API_KEY=your_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-### API Model
-- **Model**: `gemini-2.0-flash-001`
-- **Provider**: Google AI Studio
-- **Provider**: Google AI Studio
-- **Tier**: Free (1,500 requests/day)
+**Get your Groq API key:**
+1. Go to [Groq Console](https://console.groq.com)
+2. Create account (no credit card required)
+3. Navigate to API Keys
+4. Create new API key
+5. Copy and paste in `.env.local`
+
+- **Model**: `llama-3.1-8b-instant`
+- **Provider**: Groq
+- **Tier**: Free (30 requests/minute, 14,400 requests/day)
 
 ### Rate Limits
 - 15 requests per minute
@@ -124,7 +129,7 @@ POST /api/generate-fix-plan
 
 ## Deployment Checklist
 
-- [ ] `GEMINI_API_KEY` added to Vercel environment variables
+- [ ] `GROQ_API_KEY` added to Vercel environment variables
 - [ ] API route deployed and accessible
 - [ ] Types file compiled without errors
 - [ ] PostHog tracking verified in dashboard
@@ -141,8 +146,8 @@ POST /api/generate-fix-plan
 - Add email export functionality
 
 ### Model Alternatives
-- Switch to `gemini-2.0-flash` (stable) if experimental model is unstable
-- Upgrade to `gemini-1.5-pro` for more detailed plans (requires paid tier)
+- Switch to `llama-3.3-70b-versatile` if more reasoning is needed
+- Upgrade to paid tier for higher rate limits
 
 ## Troubleshooting
 
@@ -151,7 +156,7 @@ POST /api/generate-fix-plan
 **"Unable to generate fix plan" error**
 - Check API key is valid and not expired
 - Verify free tier quota not exceeded (check console logs for 429 errors)
-- Ensure `GEMINI_API_KEY` is in `.env.local` (local) or Vercel env vars (production)
+- Ensure `GROQ_API_KEY` is in `.env.local` (local) or Vercel env vars (production)
 
 **No button appears**
 - Ensure gaps exist (at least one "No", "Partial", or "Unknown" response)

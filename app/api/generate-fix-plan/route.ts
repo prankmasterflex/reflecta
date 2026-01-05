@@ -1,20 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
-// Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Initialize Groq client
+const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY || '',
+});
+
+interface Gap {
+    control_id: string;
+    control_title: string;
+    requirement: string;
+    response: 'No' | 'Partial' | 'Unknown';
+}
 
 interface RequestBody {
     industry: string;
     scopeNote: string;
-    gaps: any[];
+    gaps: Gap[];
 }
+
+const SYSTEM_PROMPT = `You are a CMMC Level 2 readiness assistant aligned to NIST SP 800-171.
+Your role is to transform assessment gaps into a practical, prioritized remediation checklist for a small defense contractor.
+
+Be clear, concrete, and action-oriented.
+Do not claim certification or audit outcomes.
+Do not request Controlled Unclassified Information (CUI).
+Output valid JSON only.`;
 
 export async function POST(request: NextRequest) {
     try {
         const body: RequestBody = await request.json();
         const { industry, scopeNote, gaps } = body;
 
+        // Validate input
         if (!gaps || gaps.length === 0) {
             return NextResponse.json(
                 { error: 'No gaps provided' },
@@ -22,23 +40,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Prepare gaps as JSON string
         const gapsJson = JSON.stringify(gaps, null, 2);
 
-        // Use stable model with proven syntax
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-001'  // ← Stable, verified accessible model
-        });
-
-        // Combine system + user prompts in single message (most reliable)
-        const combinedPrompt = `You are a CMMC Level 2 readiness assistant aligned to NIST SP 800-171.
-Your role is to transform assessment gaps into a practical, prioritized remediation checklist for a small defense contractor.
-
-Be clear, concrete, and action-oriented.
-Do not claim certification or audit outcomes.
-Do not request Controlled Unclassified Information (CUI).
-Output valid JSON only.
-
-Company context:
+        // Construct user prompt
+        const userPrompt = `Company context:
 - Industry: ${industry}
 - Notes on scope: ${scopeNote}
 
@@ -57,14 +63,30 @@ Output JSON with:
 
 Return ONLY valid JSON with no markdown formatting, no backticks, no preamble.`;
 
-        const result = await model.generateContent(combinedPrompt);
-        const response = await result.response;
-        const text = response.text();
+        // Call Groq API
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: 'system',
+                    content: SYSTEM_PROMPT,
+                },
+                {
+                    role: 'user',
+                    content: userPrompt,
+                },
+            ],
+            model: 'llama-3.1-8b-instant',
+            temperature: 0.7,
+            max_tokens: 2048,
+        });
+
+        const responseText = chatCompletion.choices[0]?.message?.content || '';
 
         // Parse JSON response
         let fixPlan;
         try {
-            const cleanedText = text
+            // Remove markdown code blocks if present
+            const cleanedText = responseText
                 .replace(/```json\n?/g, '')
                 .replace(/```\n?/g, '')
                 .trim();
@@ -72,13 +94,14 @@ Return ONLY valid JSON with no markdown formatting, no backticks, no preamble.`;
             fixPlan = JSON.parse(cleanedText);
         } catch (parseError) {
             console.error('JSON parse error:', parseError);
-            console.error('Raw response:', text);
+            console.error('Raw response:', responseText);
             return NextResponse.json(
                 { error: 'Failed to parse AI response as JSON' },
                 { status: 500 }
             );
         }
 
+        // Validate response structure
         if (!fixPlan.readiness_summary || !fixPlan.top_priorities) {
             return NextResponse.json(
                 { error: 'Invalid fix plan structure' },
