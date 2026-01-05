@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
         // Use stable model with proven syntax
         const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash'  // ← Stable, guaranteed free tier model
+            model: 'gemini-2.0-flash-001'  // ← Stable, verified accessible model
         });
 
         // Combine system + user prompts in single message (most reliable)
