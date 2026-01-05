@@ -1,112 +1,103 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-interface FixPlanRequest {
+interface RequestBody {
     industry: string;
     scopeNote: string;
-    gaps: Array<{
-        control_id: string;
-        control_title: string;
-        requirement: string;
-        response: 'No' | 'Partial' | 'Unknown';
-    }>;
+    gaps: any[];
 }
 
-const SYSTEM_PROMPT = "You are a CMMC Level 2 readiness assistant aligned to NIST SP 800-171. Your role is to transform assessment gaps into a practical, prioritized remediation checklist for a small defense contractor. Be clear, concrete, and action-oriented. Do not claim certification or audit outcomes. Do not request Controlled Unclassified Information (CUI). Output valid JSON only.";
-
-export async function POST(req: NextRequest) {
-    console.log('[FixPlanAPI] Request received');
-
+export async function POST(request: NextRequest) {
     try {
-        const body: FixPlanRequest = await req.json();
-        console.log('[FixPlanAPI] Body parsed successfully');
+        const body: RequestBody = await request.json();
+        const { industry, scopeNote, gaps } = body;
 
-        if (!body.gaps || !Array.isArray(body.gaps) || body.gaps.length === 0) {
-            console.warn('[FixPlanAPI] Invalid gaps array');
+        if (!gaps || gaps.length === 0) {
             return NextResponse.json(
-                { error: 'Invalid request: gaps array is required' },
+                { error: 'No gaps provided' },
                 { status: 400 }
             );
         }
 
-        // Check for API key
-        if (!process.env.GEMINI_API_KEY) {
-            console.error('[FixPlanAPI] GEMINI_API_KEY is not configured');
-            return NextResponse.json(
-                { error: 'Server configuration error: GEMINI_API_KEY is missing' },
-                { status: 500 }
-            );
-        }
-        console.log('[FixPlanAPI] API Key present');
+        const gapsJson = JSON.stringify(gaps, null, 2);
 
+        // Use stable model with proven syntax
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash-001',
+            model: 'gemini-1.5-flash'  // ← Stable, guaranteed free tier model
         });
 
-        const userPrompt = `
-Context:
-Industry: ${body.industry}
-Scope Note: ${body.scopeNote}
+        // Combine system + user prompts in single message (most reliable)
+        const combinedPrompt = `You are a CMMC Level 2 readiness assistant aligned to NIST SP 800-171.
+Your role is to transform assessment gaps into a practical, prioritized remediation checklist for a small defense contractor.
 
-Assessment Gaps:
-${JSON.stringify(body.gaps, null, 2)}
+Be clear, concrete, and action-oriented.
+Do not claim certification or audit outcomes.
+Do not request Controlled Unclassified Information (CUI).
+Output valid JSON only.
 
-Request:
-Generate a remediation plan in JSON format with the following structure:
-{
-  "readiness_summary": ["3 bullet points summarizing the overall state"],
-  "top_priorities": [
-    {
-      "control_id": "string",
-      "why_it_matters": "string",
-      "what_to_do": ["specific action items"],
-      "estimated_effort": "Low/Medium/High"
-    }
-  ] (limit to 10 items),
-  "quick_wins_7_days": [
-    "up to 5 specific tasks that can be done in a week"
-  ],
-  "audit_risk_notes": [
-    "up to 5 notes starting with 'If missing, an assessor will likely...'"
-  ]
-}
-`;
+Company context:
+- Industry: ${industry}
+- Notes on scope: ${scopeNote}
 
-        console.log('[FixPlanAPI] Sending request to Gemini...');
-        const result = await model.generateContent([
-            SYSTEM_PROMPT,
-            userPrompt
-        ]);
+Assessment gaps:
+${gapsJson}
 
-        const responseText = result.response.text();
-        console.log('[FixPlanAPI] Received response from Gemini. Length:', responseText.length);
+Output JSON with:
+1. readiness_summary: 3 bullet points
+2. top_priorities: array of up to 10 items, each with:
+   - control_id
+   - why_it_matters (1 sentence)
+   - what_to_do (array of 3–5 steps)
+   - estimated_effort (S / M / L)
+3. quick_wins_7_days: up to 5 items
+4. audit_risk_notes: up to 5 items phrased as "If missing, an assessor will likely…"
 
-        // Clean up potential markdown formatting (```json ... ```)
-        const cleanedText = responseText
-            .replace(/^```json\s*/, '')
-            .replace(/^```\s*/, '')
-            .replace(/\s*```$/, '');
+Return ONLY valid JSON with no markdown formatting, no backticks, no preamble.`;
 
+        const result = await model.generateContent(combinedPrompt);
+        const response = await result.response;
+        const text = response.text();
+
+        // Parse JSON response
+        let fixPlan;
         try {
-            const parsedJson = JSON.parse(cleanedText);
-            console.log('[FixPlanAPI] JSON parsed successfully');
-            return NextResponse.json(parsedJson);
+            const cleanedText = text
+                .replace(/```json\n?/g, '')
+                .replace(/```\n?/g, '')
+                .trim();
+
+            fixPlan = JSON.parse(cleanedText);
         } catch (parseError) {
-            console.error('[FixPlanAPI] Error parsing Gemini response:', parseError);
-            console.error('[FixPlanAPI] Raw response:', responseText);
+            console.error('JSON parse error:', parseError);
+            console.error('Raw response:', text);
             return NextResponse.json(
-                { error: 'Failed to parse remediation plan', raw_response: responseText },
+                { error: 'Failed to parse AI response as JSON' },
                 { status: 500 }
             );
         }
 
+        if (!fixPlan.readiness_summary || !fixPlan.top_priorities) {
+            return NextResponse.json(
+                { error: 'Invalid fix plan structure' },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json(fixPlan);
+
     } catch (error: any) {
-        console.error('[FixPlanAPI] Error generating fix plan:', error);
-        console.error('[FixPlanAPI] Stack:', error?.stack);
+        console.error('Fix plan generation error:', error);
+
+        // Log specific error details
+        if (error.message) {
+            console.error('Error message:', error.message);
+        }
+
         return NextResponse.json(
-            { error: 'Internal server error', details: error?.message || String(error) },
+            { error: 'Failed to generate fix plan' },
             { status: 500 }
         );
     }
