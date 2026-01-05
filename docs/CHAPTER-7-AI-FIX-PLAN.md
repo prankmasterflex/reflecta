@@ -46,7 +46,8 @@ GEMINI_API_KEY=your_api_key_here
 ```
 
 ### API Model
-- **Model**: `gemini-2.0-flash-exp`
+- **Model**: `gemini-1.5-flash`
+- **Provider**: Google AI Studio
 - **Provider**: Google AI Studio
 - **Tier**: Free (1,500 requests/day)
 
