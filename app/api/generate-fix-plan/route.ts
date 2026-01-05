@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         console.log('[FixPlanAPI] API Key present');
 
         const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash-001',
+            model: 'gemini-2.0-flash-001',
             systemInstruction: SYSTEM_PROMPT,
         });
 
