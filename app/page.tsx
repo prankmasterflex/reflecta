@@ -27,13 +27,17 @@ export default function HomePage() {
             <section className="container mx-auto px-4 py-16 md:py-24">
                 <div className="max-w-4xl mx-auto text-center">
                     <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-                        {EXPERIMENT_CONTENT.headline[headlineVariant]}
+                        CMMC Level 2 Readiness Assessment
                     </h1>
 
-                    <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
-                        Get a comprehensive assessment of your organization's CMMC compliance status.
-                        Identify gaps and receive actionable recommendations.
-                    </p>
+                    <div className="mb-8 max-w-2xl mx-auto space-y-4">
+                        <p className="text-xl text-slate-600">
+                            Assess your organization's alignment with NIST SP 800-171 requirements used for CMMC Level 2 compliance.
+                        </p>
+                        <p className="text-base text-slate-500">
+                            Designed for defense contractors handling Controlled Unclassified Information (CUI).
+                        </p>
+                    </div>
 
                     <button
                         onClick={handleCtaClick}
