@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import posthog from 'posthog-js';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { ResponseValue } from '@/types/scoring';
 import { calculateReadiness } from '@/lib/scoring';
 import { SAMPLE_CONTROLS } from '@/components/assessment/controlsData';
@@ -17,6 +19,8 @@ export default function AssessmentPage() {
     const [fixPlan, setFixPlan] = useState<FixPlan | null>(null);
     const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
     const [planError, setPlanError] = useState<string | null>(null);
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     // Reactively calculate readiness whenever responses change
     const readinessSummary = useMemo(() => {
@@ -43,6 +47,15 @@ export default function AssessmentPage() {
             }
         }
     }, [readinessSummary, responses]);
+
+    // Track paywall view
+    useEffect(() => {
+        if (fixPlan && !isUnlocked && typeof window !== 'undefined' && (window as any).posthog) {
+            (window as any).posthog.capture('paywall_viewed', {
+                timestamp: new Date().toISOString()
+            });
+        }
+    }, [fixPlan, isUnlocked]);
 
     // Track assessment completion milestone
     useEffect(() => {
@@ -129,12 +142,69 @@ export default function AssessmentPage() {
         }
     };
 
+    const handleUnlock = () => {
+        setIsUnlocked(true);
+        posthog.capture('payment_unlocked', {
+            timestamp: new Date().toISOString()
+        });
+    };
+
+    const handleDownloadReport = async () => {
+        if (!isUnlocked) return;
+        setIsExporting(true);
+
+        try {
+            const reportElement = document.getElementById('report-content');
+            if (!reportElement) return;
+
+            const canvas = await html2canvas(reportElement, {
+                scale: 2,
+                logging: false,
+                useCORS: true
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const imgWidth = 210;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+            // Add Footer
+            const pageCount = pdf.internal.pages.length - 1; // jsPDF fix
+            pdf.setFontSize(10);
+            pdf.setTextColor(150);
+            pdf.text('This report supports readiness planning only. It does not provide certification or audit results.', 105, 290, { align: 'center' });
+
+            pdf.save('reflecta-readiness-report.pdf');
+
+            posthog.capture('report_exported', {
+                timestamp: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error('Export failed:', error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 py-8">
-            <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+
+                {/* Main Page Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900">CMMC Assessment</h1>
+                    <p className="text-gray-600 mt-2">Level 2 - Control Assessment</p>
+                </div>
 
                 {/* Tab Navigation */}
-                <div className="mb-6 border-b border-gray-200">
+                <div className="mb-8 border-b border-gray-200">
                     <nav className="-mb-px flex space-x-8">
                         <button
                             onClick={() => setActiveTab('assessment')}
@@ -174,7 +244,7 @@ export default function AssessmentPage() {
                             </div>
                             <div>
                                 <div className="text-2xl font-bold text-gray-700">
-                                    {Array.from(responses.values()).filter((r) => r !== 'Unknown').length} / {readinessSummary.totalControls}
+                                    {responses.size} / {readinessSummary.totalControls}
                                 </div>
                                 <div className="text-xs text-gray-600">Answered</div>
                             </div>
@@ -197,10 +267,13 @@ export default function AssessmentPage() {
                 {/* Content Area - Conditionally render based on active tab */}
                 {activeTab === 'assessment' ? (
                     <div>
-                        <AssessmentForm onResponseChange={handleResponseChange} />
+                        <AssessmentForm
+                            onResponseChange={handleResponseChange}
+                            onComplete={() => setActiveTab('summary')}
+                        />
                     </div>
                 ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-6" id="report-content">
                         <ReadinessSummaryCard summary={readinessSummary} />
                         <GapsList gaps={readinessSummary.gaps} />
 
@@ -228,59 +301,101 @@ export default function AssessmentPage() {
                                 )}
 
                                 {fixPlan && (
-                                    <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                                        <h3 className="text-xl font-bold text-gray-900 mb-4">AI Remediation Plan</h3>
-
-                                        <div className="mb-6">
-                                            <h4 className="font-semibold text-gray-900 mb-2">Readiness Summary</h4>
-                                            <ul className="list-disc pl-5 space-y-1">
-                                                {fixPlan.readiness_summary.map((item, i) => (
-                                                    <li key={i} className="text-gray-700">{item}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-
-                                        <div className="mb-6">
-                                            <h4 className="font-semibold text-gray-900 mb-2">Top Priorities</h4>
-                                            <div className="space-y-4">
-                                                {fixPlan.top_priorities.map((priority, i) => (
-                                                    <div key={i} className="border-l-4 border-blue-500 pl-4 py-1">
-                                                        <div className="flex justify-between items-start">
-                                                            <span className="font-bold text-gray-800">{priority.control_id}</span>
-                                                            <span className={`text-xs px-2 py-1 rounded font-medium ${priority.estimated_effort === 'L' ? 'bg-red-100 text-red-800' :
-                                                                priority.estimated_effort === 'M' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    'bg-green-100 text-green-800'
-                                                                }`}>
-                                                                Effort: {priority.estimated_effort}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm text-gray-600 mt-1 italic">{priority.why_it_matters}</p>
-                                                        <ul className="mt-2 list-disc pl-5 text-sm text-gray-700">
-                                                            {priority.what_to_do.map((action, j) => (
-                                                                <li key={j}>{action}</li>
-                                                            ))}
-                                                        </ul>
+                                    <div className="mt-8 relative">
+                                        {/* Blur Mask for Locked State */}
+                                        {!isUnlocked && (
+                                            <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] flex items-center justify-center rounded-lg border border-gray-200">
+                                                <div className="bg-white p-8 rounded-xl shadow-2xl border border-blue-100 max-w-md text-center">
+                                                    <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600">
+                                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                        </svg>
                                                     </div>
-                                                ))}
+                                                    <h3 className="text-xl font-bold text-gray-900 mb-2">Unlock Full Remediation Plan</h3>
+                                                    <p className="text-gray-600 mb-6">Get detailed AI-driven fix steps, effort estimates, and a downloadable PDF report.</p>
+                                                    <button
+                                                        onClick={handleUnlock}
+                                                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md transform hover:-translate-y-0.5"
+                                                    >
+                                                        Unlock Report - $49
+                                                    </button>
+                                                    <p className="text-xs text-gray-400 mt-4">One-time payment. Secure checkout.</p>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
-                                        <div className="grid md:grid-cols-2 gap-6">
-                                            <div>
-                                                <h4 className="font-semibold text-gray-900 mb-2 text-green-700">Quick Wins (7 Days)</h4>
-                                                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                                                    {fixPlan.quick_wins_7_days.map((win, i) => (
-                                                        <li key={i}>{win}</li>
+                                        <div className={`mt-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm transition-all ${!isUnlocked ? 'filter blur-sm select-none pointer-events-none opacity-50' : ''}`}>
+                                            <div className="flex justify-between items-center mb-6">
+                                                <h3 className="text-xl font-bold text-gray-900">AI Remediation Plan</h3>
+                                                {isUnlocked && (
+                                                    <button
+                                                        onClick={handleDownloadReport}
+                                                        disabled={isExporting}
+                                                        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {isExporting ? 'Exporting...' : (
+                                                            <>
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                </svg>
+                                                                Download PDF
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <div className="mb-6">
+                                                <h4 className="font-semibold text-gray-900 mb-2">Readiness Summary</h4>
+                                                <ul className="list-disc pl-5 space-y-1">
+                                                    {fixPlan.readiness_summary.map((item, i) => (
+                                                        <li key={i} className="text-gray-700">{item}</li>
                                                     ))}
                                                 </ul>
                                             </div>
-                                            <div>
-                                                <h4 className="font-semibold text-gray-900 mb-2 text-red-700">Audit Risks</h4>
-                                                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
-                                                    {fixPlan.audit_risk_notes.map((risk, i) => (
-                                                        <li key={i}>{risk}</li>
+
+                                            <div className="mb-6">
+                                                <h4 className="font-semibold text-gray-900 mb-2">Top Priorities</h4>
+                                                <div className="space-y-4">
+                                                    {fixPlan.top_priorities.map((priority, i) => (
+                                                        <div key={i} className="border-l-4 border-blue-500 pl-4 py-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <span className="font-bold text-gray-800">{priority.control_id}</span>
+                                                                <span className={`text-xs px-2 py-1 rounded font-medium ${priority.estimated_effort === 'L' ? 'bg-red-100 text-red-800' :
+                                                                    priority.estimated_effort === 'M' ? 'bg-yellow-100 text-yellow-800' :
+                                                                        'bg-green-100 text-green-800'
+                                                                    }`}>
+                                                                    Effort: {priority.estimated_effort}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm text-gray-600 mt-1 italic">{priority.why_it_matters}</p>
+                                                            <ul className="mt-2 list-disc pl-5 text-sm text-gray-700">
+                                                                {priority.what_to_do.map((action, j) => (
+                                                                    <li key={j}>{action}</li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
                                                     ))}
-                                                </ul>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-900 mb-2 text-green-700">Quick Wins (7 Days)</h4>
+                                                    <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                                                        {fixPlan.quick_wins_7_days.map((win, i) => (
+                                                            <li key={i}>{win}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-900 mb-2 text-red-700">Audit Risks</h4>
+                                                    <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+                                                        {fixPlan.audit_risk_notes.map((risk, i) => (
+                                                            <li key={i}>{risk}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
