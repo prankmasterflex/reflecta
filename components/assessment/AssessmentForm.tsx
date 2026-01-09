@@ -106,9 +106,10 @@ export default function AssessmentForm({ onResponseChange, onComplete }: Assessm
                                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
                                             Decision
                                         </label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                        <div className="grid grid-cols-2 gap-3">
                                             {RESPONSE_OPTIONS.map((option) => {
                                                 const isSelected = response?.response === option;
+                                                const isLast = option === 'Not Applicable';
                                                 return (
                                                     <button
                                                         key={option}
@@ -120,6 +121,7 @@ export default function AssessmentForm({ onResponseChange, onComplete }: Assessm
                                                                 ? 'border-blue-600 bg-blue-600 text-white z-10 scale-[1.02]'
                                                                 : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                                                             }
+                                                            ${isLast ? 'col-span-2' : ''}
                                                         `}
                                                     >
                                                         {option}
