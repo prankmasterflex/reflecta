@@ -1,24 +1,45 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SAMPLE_CONTROLS, RESPONSE_OPTIONS, type ControlResponse, type ResponseOption } from './controlsData';
+import { saveProgress, clearProgress } from '@/lib/assessmentProgress';
 
 interface AssessmentFormProps {
     onResponseChange?: (controlId: string, response: ResponseOption) => void;
     onComplete?: () => void;
+    initialResponses?: Record<string, ControlResponse>;
 }
 
-export default function AssessmentForm({ onResponseChange, onComplete }: AssessmentFormProps) {
-    const [responses, setResponses] = useState<Record<string, ControlResponse>>({});
+export default function AssessmentForm({ onResponseChange, onComplete, initialResponses }: AssessmentFormProps) {
+    const [responses, setResponses] = useState<Record<string, ControlResponse>>(initialResponses || {});
+    // Track start time for duration analytics
+    const [startedAt] = useState<string>(new Date().toISOString());
+
+    useEffect(() => {
+        if (initialResponses) {
+            setResponses(initialResponses);
+        }
+    }, [initialResponses]);
 
     const handleResponseChange = (controlId: string, response: ResponseOption) => {
-        setResponses(prev => ({
-            ...prev,
-            [controlId]: {
-                response,
-                notes: prev[controlId]?.notes || ''
-            }
-        }));
+        setResponses(prev => {
+            const next = {
+                ...prev,
+                [controlId]: {
+                    response,
+                    notes: prev[controlId]?.notes || ''
+                }
+            };
+
+            // Autosave
+            saveProgress({
+                answers: next,
+                currentStep: 0,
+                startedAt
+            });
+
+            return next;
+        });
 
         // Notify parent
         onResponseChange?.(controlId, response);
@@ -33,13 +54,24 @@ export default function AssessmentForm({ onResponseChange, onComplete }: Assessm
     };
 
     const handleNotesChange = (controlId: string, notes: string) => {
-        setResponses(prev => ({
-            ...prev,
-            [controlId]: {
-                response: prev[controlId]?.response,
-                notes
-            }
-        }));
+        setResponses(prev => {
+            const next = {
+                ...prev,
+                [controlId]: {
+                    response: prev[controlId]?.response,
+                    notes
+                }
+            };
+
+            // Autosave
+            saveProgress({
+                answers: next,
+                currentStep: 0,
+                startedAt
+            });
+
+            return next;
+        });
     };
 
     // Calculate progress
@@ -174,7 +206,14 @@ export default function AssessmentForm({ onResponseChange, onComplete }: Assessm
                 <button
                     type="button"
                     disabled={!isComplete}
-                    onClick={onComplete}
+                    onClick={() => {
+                        clearProgress();
+                        if (typeof window !== 'undefined' && (window as any).posthog) {
+                            const duration = (Date.now() - new Date(startedAt).getTime()) / 1000;
+                            (window as any).posthog.capture('assessment_completed', { duration_seconds: duration });
+                        }
+                        onComplete?.();
+                    }}
                     className={`
                         px-8 py-3 
                         rounded-lg font-medium 

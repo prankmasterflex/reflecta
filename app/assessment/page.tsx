@@ -11,11 +11,37 @@ import { ReadinessSummaryCard } from '@/components/assessment/ReadinessSummary';
 import { GapsList } from '@/components/assessment/GapsList';
 import { FixPlan, Gap, FixPlanRequest } from '@/types/fixplan';
 import EmailVerificationModal from '@/components/assessment/EmailVerificationModal';
+import ResumeModal from '@/components/assessment/ResumeModal';
+import { getProgress, getProgressSummary, SavedProgress, clearProgress } from '@/lib/assessmentProgress';
+import { ControlResponse } from '@/components/assessment/controlsData';
 
 export default function AssessmentPage() {
     // State for tracking responses
     const [responses, setResponses] = useState<Map<string, ResponseValue>>(new Map());
     const [activeTab, setActiveTab] = useState<'assessment' | 'summary'>('assessment');
+
+    // Resume / Progress State
+    const [showResumeModal, setShowResumeModal] = useState(false);
+    const [savedProgress, setSavedProgress] = useState<SavedProgress | null>(null);
+    const [progressSummary, setProgressSummary] = useState<{ answeredCount: number; totalControls: number; percentComplete: number; lastUpdatedAt: string } | null>(null);
+    const [initialResponses, setInitialResponses] = useState<Record<string, ControlResponse> | undefined>(undefined);
+    const [startKey, setStartKey] = useState(0); // To force re-render of form on resume/reset
+
+    useEffect(() => {
+        const progress = getProgress();
+        const summary = getProgressSummary();
+
+        if (progress && summary && summary.answeredCount > 0) {
+            setSavedProgress(progress);
+            setProgressSummary({ ...summary, lastUpdatedAt: progress.lastUpdatedAt });
+            setShowResumeModal(true);
+        } else {
+            posthog.capture('assessment_started', {
+                is_fresh_start: true,
+                source: 'landing_page'
+            });
+        }
+    }, []);
     const [fixPlan, setFixPlan] = useState<FixPlan | null>(null);
     const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
     const [planError, setPlanError] = useState<string | null>(null);
@@ -261,6 +287,36 @@ export default function AssessmentPage() {
         }
     };
 
+    const handleResume = () => {
+        if (savedProgress) {
+            const formResponses: Record<string, ControlResponse> = {};
+            const pageResponses = new Map(responses); // Copy existing if any, though usually empty on first load
+
+            Object.entries(savedProgress.answers).forEach(([id, data]) => {
+                formResponses[id] = { response: data.response as ResponseValue, notes: data.notes };
+                if (data.response) {
+                    pageResponses.set(id, data.response as ResponseValue);
+                }
+            });
+
+            setInitialResponses(formResponses);
+            setResponses(pageResponses);
+            setStartKey(prev => prev + 1);
+            setShowResumeModal(false);
+        }
+    };
+
+    const handleStartOver = () => {
+        clearProgress();
+        setSavedProgress(null);
+        setProgressSummary(null);
+        setInitialResponses(undefined);
+        setResponses(new Map());
+        setStartKey(prev => prev + 1);
+        setShowResumeModal(false);
+        // posthog event handled in Modal component or here? Modal component handles it.
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 py-8">
             <div className="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -336,8 +392,13 @@ export default function AssessmentPage() {
                 {activeTab === 'assessment' ? (
                     <div>
                         <AssessmentForm
+                            key={startKey}
                             onResponseChange={handleResponseChange}
-                            onComplete={() => setActiveTab('summary')}
+                            onComplete={() => {
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                setActiveTab('summary');
+                            }}
+                            initialResponses={initialResponses}
                         />
                     </div>
                 ) : (
@@ -425,6 +486,34 @@ export default function AssessmentPage() {
                                                 </ul>
                                             </div>
 
+                                            <div className="text-center mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+                                                <p className="text-sm text-yellow-800 font-medium">
+                                                    This score reflects alignment with <span className="font-bold">10 core control areas</span>.
+                                                </p>
+                                                <p className="text-xs text-yellow-700 mt-1">
+                                                    A complete CMMC Level 2 assessment requires compliance with all 110 practices.
+                                                </p>
+                                            </div>
+
+                                            <div className="mt-8 pt-8 border-t border-gray-100">
+                                                <h4 className="text-sm font-semibold text-gray-900 mb-3 uppercase tracking-wider">Understanding Your Score</h4>
+                                                <div className="bg-gray-50 rounded-lg p-4 text-justify">
+                                                    {readinessSummary.readinessPercent >= 80 ? (
+                                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                                            Your organization shows <span className="font-semibold text-green-700">strong foundational alignment</span> with CMMC Level 2 requirements in the areas assessed. Focus on addressing the identified gaps and consider a comprehensive assessment covering all 110 practices.
+                                                        </p>
+                                                    ) : readinessSummary.readinessPercent >= 50 ? (
+                                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                                            Your organization has <span className="font-semibold text-amber-700">partial alignment</span> with CMMC Level 2 requirements. The gaps identified represent priority areas for remediation before pursuing formal certification.
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-sm text-gray-600 leading-relaxed">
+                                                            Your organization has <span className="font-semibold text-red-700">significant gaps</span> in foundational CMMC Level 2 requirements. We recommend prioritizing the identified control areas and developing a structured remediation plan.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
                                             <div className="mb-6">
                                                 <h4 className="font-semibold text-gray-900 mb-2">Top Priorities</h4>
                                                 <div className="space-y-4">
@@ -473,6 +562,13 @@ export default function AssessmentPage() {
                                 )}
                             </div>
                         )}
+                        <div className="mt-8 pt-8 border-t border-gray-100">
+                            <h4 className="text-sm font-semibold text-gray-900 mb-4">Gaps to Address</h4>
+                            <p className="text-xs text-gray-500 mb-4 italic">
+                                Note: The gaps identified below represent areas where your current practices may not fully align with CMMC Level 2 requirements. This assessment covers foundational controls — a complete CMMC Level 2 certification requires demonstrating compliance across all 110 practices.
+                            </p>
+                            <GapsList gaps={readinessSummary.gaps} />
+                        </div>
                     </div>
                 )}
             </div>
@@ -487,6 +583,15 @@ export default function AssessmentPage() {
                     gaps: readinessSummary.gaps.map(g => g.controlId)
                 }}
             />
+
+            {progressSummary && (
+                <ResumeModal
+                    isOpen={showResumeModal}
+                    progressSummary={progressSummary}
+                    onResume={handleResume}
+                    onStartOver={handleStartOver}
+                />
+            )}
         </div>
     );
 }
