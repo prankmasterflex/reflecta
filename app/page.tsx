@@ -43,8 +43,11 @@ export default function HomePage() {
                         onClick={handleCtaClick}
                         className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-colors duration-200 shadow-lg hover:shadow-xl"
                     >
-                        {EXPERIMENT_CONTENT.cta[ctaVariant]}
+                        Start Level 2 Readiness Assessment
                     </button>
+                    <p className="mt-4 text-sm text-slate-500">
+                        Internal assessment · No signup · ~10 core controls
+                    </p>
 
                     {process.env.NODE_ENV === 'development' && (
                         <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded text-sm text-left max-w-md mx-auto">
