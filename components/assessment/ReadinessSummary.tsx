@@ -31,19 +31,19 @@ export function ReadinessSummaryCard({ summary }: ReadinessSummaryProps) {
             <div className="grid grid-cols-1 lg:grid-cols-12">
 
                 {/* Left Column: Readiness Hero Block */}
-                <div className="lg:col-span-5 p-8 flex flex-col items-center justify-center text-center gap-3">
-                    <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <div className="readiness-hero lg:col-span-5 p-8 flex flex-col items-center justify-center text-center gap-3">
+                    <div className="readiness-label text-xs font-medium uppercase tracking-wide text-gray-500">
                         Readiness Score
-                    </span>
-                    <div className={`text-6xl font-bold leading-none ${getReadinessColor(summary.readinessPercent)}`}>
+                    </div>
+                    <div className={`readiness-value text-6xl font-bold leading-none ${getReadinessColor(summary.readinessPercent)}`}>
                         {summary.readinessPercent}%
                     </div>
-                    <span className={`inline-flex rounded-full px-4 py-1 text-sm font-medium ${summary.readinessPercent >= 80 ? 'bg-green-100 text-green-800' :
-                            summary.readinessPercent >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
+                    <div className={`readiness-status inline-flex rounded-full px-4 py-1 text-sm font-medium ${summary.readinessPercent >= 80 ? 'bg-green-100 text-green-800' :
+                        summary.readinessPercent >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
                         }`}>
                         {getReadinessLabel(summary.readinessPercent)}
-                    </span>
+                    </div>
                 </div>
 
                 {/* Right Column: Metrics & Progress */}
