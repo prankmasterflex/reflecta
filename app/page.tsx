@@ -87,12 +87,12 @@ export default function HomePage() {
                         </div>
 
                         <div className="bg-white p-6 rounded-lg shadow-md">
-                            <div className="text-3xl mb-4">💰</div>
+                            <div className="text-3xl mb-4">kb</div>
                             <h3 className="text-xl font-semibold text-slate-900 mb-3">
-                                Save Time & Money
+                                Structured Remediation
                             </h3>
                             <p className="text-slate-600">
-                                Avoid costly surprises and streamline your certification process with clear action items.
+                                Receive clear, prioritized action items to address identified compliance gaps.
                             </p>
                         </div>
                     </div>
@@ -103,10 +103,10 @@ export default function HomePage() {
                 <div className="container mx-auto px-4">
                     <div className="max-w-4xl mx-auto text-center">
                         <h2 className="text-2xl font-bold text-slate-900 mb-4">
-                            Trusted by Defense Contractors
+                            Designed for Defense Contractors
                         </h2>
                         <p className="text-slate-600 mb-8">
-                            Join hundreds of organizations preparing for CMMC Level 2 certification
+                            Prepare for CMMC Level 2 certification with a structured assessment
                         </p>
 
                         <button
