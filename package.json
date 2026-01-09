@@ -22,6 +22,8 @@
   "description": "",
   "dependencies": {
     "groq-sdk": "^0.37.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.0.0",
     "next": "^16.1.1",
     "posthog-js": "^1.313.0",
     "react": "^19.2.3",
