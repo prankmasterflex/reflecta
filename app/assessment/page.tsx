@@ -11,6 +11,7 @@ import AssessmentForm from '@/components/assessment/AssessmentForm';
 import { ReadinessSummaryCard } from '@/components/assessment/ReadinessSummary';
 import { GapsList } from '@/components/assessment/GapsList';
 import { FixPlan, Gap, FixPlanRequest } from '@/types/fixplan';
+import EmailVerificationModal from '@/components/assessment/EmailVerificationModal';
 
 export default function AssessmentPage() {
     // State for tracking responses
@@ -21,6 +22,30 @@ export default function AssessmentPage() {
     const [planError, setPlanError] = useState<string | null>(null);
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+
+    // Email verification state
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [isEmailVerified, setIsEmailVerified] = useState(false);
+    const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+
+    // Check for previously verified email
+    useEffect(() => {
+        const stored = localStorage.getItem('reflecta_verified_email');
+        if (stored) {
+            try {
+                const { email, timestamp } = JSON.parse(stored);
+                const hoursSince = (Date.now() - timestamp) / (1000 * 60 * 60);
+                if (hoursSince < 24) {
+                    setIsEmailVerified(true);
+                    setVerifiedEmail(email);
+                } else {
+                    localStorage.removeItem('reflecta_verified_email');
+                }
+            } catch {
+                localStorage.removeItem('reflecta_verified_email');
+            }
+        }
+    }, []);
 
     // Reactively calculate readiness whenever responses change
     const readinessSummary = useMemo(() => {
@@ -149,7 +174,28 @@ export default function AssessmentPage() {
         });
     };
 
-    const handleDownloadReport = async () => {
+    const handleEmailVerified = (email: string) => {
+        localStorage.setItem('reflecta_verified_email', JSON.stringify({
+            email,
+            timestamp: Date.now()
+        }));
+        setIsEmailVerified(true);
+        setVerifiedEmail(email);
+        setShowEmailModal(false);
+        handlePdfDownload();
+        posthog.capture('pdf_downloaded', { verified: true, returning_user: false });
+    };
+
+    const onDownloadClick = () => {
+        if (isEmailVerified) {
+            handlePdfDownload();
+            posthog.capture('pdf_downloaded', { verified: true, returning_user: true });
+        } else {
+            setShowEmailModal(true);
+        }
+    };
+
+    const handlePdfDownload = async () => {
         if (!isUnlocked) return;
         setIsExporting(true);
 
@@ -329,7 +375,7 @@ export default function AssessmentPage() {
                                                 <h3 className="text-xl font-bold text-gray-900">AI Remediation Plan</h3>
                                                 {isUnlocked && (
                                                     <button
-                                                        onClick={handleDownloadReport}
+                                                        onClick={onDownloadClick}
                                                         disabled={isExporting}
                                                         className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors disabled:opacity-50"
                                                     >
@@ -404,8 +450,18 @@ export default function AssessmentPage() {
                         )}
                     </div>
                 )}
-
             </div>
+
+            <EmailVerificationModal
+                isOpen={showEmailModal}
+                onClose={() => setShowEmailModal(false)}
+                onVerified={handleEmailVerified}
+                scoreData={{
+                    score: readinessSummary.readinessPercent,
+                    gapCount: readinessSummary.gapCount,
+                    gaps: readinessSummary.gaps.map(g => g.controlId)
+                }}
+            />
         </div>
     );
 }

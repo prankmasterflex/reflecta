@@ -21,6 +21,7 @@
   "homepage": "https://github.com/prankmasterflex/reflecta#readme",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
     "groq-sdk": "^0.37.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",
@@ -28,7 +29,9 @@
     "posthog-js": "^1.313.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "react-hook-form": "^7.70.0"
+    "react-hook-form": "^7.70.0",
+    "resend": "^6.7.0",
+    "stripe": "^20.1.2"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

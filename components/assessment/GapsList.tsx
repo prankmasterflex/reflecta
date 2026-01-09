@@ -74,7 +74,7 @@ export function GapsList({ gaps }: GapsListProps) {
     };
 
     return (
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">Gaps Identified</h2>
                 <span className="text-sm text-gray-500">
