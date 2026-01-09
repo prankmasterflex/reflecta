@@ -111,9 +111,9 @@ export default function HomePage() {
 
                         <button
                             onClick={handleCtaClick}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-lg text-lg transition-colors duration-200 shadow-lg hover:shadow-xl"
+                            className="bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-600 font-semibold px-8 py-4 rounded-lg text-lg transition-colors duration-200 shadow-sm hover:shadow-md"
                         >
-                            {EXPERIMENT_CONTENT.cta[ctaVariant]}
+                            Check My CMMC Level 2 Readiness
                         </button>
                     </div>
                 </div>
