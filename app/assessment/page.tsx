@@ -27,6 +27,7 @@ export default function AssessmentPage() {
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [isEmailVerified, setIsEmailVerified] = useState(false);
     const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+    const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
     // Check for previously verified email
     useEffect(() => {
@@ -167,11 +168,50 @@ export default function AssessmentPage() {
         }
     };
 
-    const handleUnlock = () => {
-        setIsUnlocked(true);
-        posthog.capture('payment_unlocked', {
-            timestamp: new Date().toISOString()
-        });
+    const handleUnlock = async () => {
+        const paywallMode = process.env.NEXT_PUBLIC_PAYWALL_MODE || 'stub';
+
+        if (paywallMode === 'stub') {
+            setIsUnlocked(true);
+            posthog.capture('payment_unlocked', {
+                timestamp: new Date().toISOString(),
+                mode: 'stub'
+            });
+            return;
+        }
+
+        // Stripe mode
+        posthog.capture('checkout_started');
+        setCheckoutError(null);
+
+        try {
+            const response = await fetch('/api/stripe/create-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            const data = await response.json();
+
+            if (data.fallback) {
+                console.log('[Paywall] Falling back to stub unlock');
+                setIsUnlocked(true);
+                posthog.capture('payment_unlocked', {
+                    timestamp: new Date().toISOString(),
+                    mode: 'fallback'
+                });
+                return;
+            }
+
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                throw new Error('No checkout URL returned');
+            }
+        } catch (error) {
+            console.error('[Paywall] Checkout error:', error);
+            posthog.capture('checkout_failed', { error: String(error) });
+            setCheckoutError('Unable to start checkout. Please try again.');
+        }
     };
 
     const handleEmailVerified = (email: string) => {
@@ -365,6 +405,9 @@ export default function AssessmentPage() {
                                                     >
                                                         Unlock Report - $49
                                                     </button>
+                                                    {checkoutError && (
+                                                        <p className="text-red-600 text-sm mt-2">{checkoutError}</p>
+                                                    )}
                                                     <p className="text-xs text-gray-400 mt-4">One-time payment. Secure checkout.</p>
                                                 </div>
                                             </div>
