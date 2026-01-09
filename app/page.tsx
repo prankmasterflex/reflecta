@@ -118,6 +118,11 @@ export default function HomePage() {
                     </div>
                 </div>
             </section>
+            <footer className="container mx-auto px-4 py-8 text-center border-t border-slate-100 mt-12 bg-white">
+                <p className="text-xs text-slate-400 max-w-3xl mx-auto">
+                    This tool provides an internal readiness assessment and does not constitute certification, attestation, or a formal CMMC audit. Results are for internal planning purposes only.
+                </p>
+            </footer>
         </div>
     )
 }
