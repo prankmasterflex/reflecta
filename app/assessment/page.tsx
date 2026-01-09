@@ -2,11 +2,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import posthog from 'posthog-js';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { ResponseValue } from '@/types/scoring';
-import { calculateReadiness } from '@/lib/scoring';
+import { generateReadinessReport } from '@/lib/pdf-generator';
 import { SAMPLE_CONTROLS } from '@/components/assessment/controlsData';
+import { calculateReadiness } from '@/lib/scoring';
 import AssessmentForm from '@/components/assessment/AssessmentForm';
 import { ReadinessSummaryCard } from '@/components/assessment/ReadinessSummary';
 import { GapsList } from '@/components/assessment/GapsList';
@@ -214,68 +213,51 @@ export default function AssessmentPage() {
         }
     };
 
+    const handlePdfDownload = async () => {
+        setIsExporting(true);
+        posthog.capture('pdf_generation_started', {
+            score: readinessSummary.readinessPercent,
+            gap_count: readinessSummary.gapCount
+        });
+
+        try {
+            await generateReadinessReport({ readinessSummary });
+            posthog.capture('pdf_generation_completed', {
+                score: readinessSummary.readinessPercent,
+                gap_count: readinessSummary.gapCount
+            });
+            posthog.capture('pdf_downloaded', { verified: true, returning_user: !!verifiedEmail });
+        } catch (error) {
+            console.error('PDF Generation failed:', error);
+            posthog.capture('pdf_generation_failed', {
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const handleEmailVerified = (email: string) => {
+        setIsEmailVerified(true);
+        setVerifiedEmail(email);
+        setShowEmailModal(false);
+
+        // Persist for 24 hours
         localStorage.setItem('reflecta_verified_email', JSON.stringify({
             email,
             timestamp: Date.now()
         }));
-        setIsEmailVerified(true);
-        setVerifiedEmail(email);
-        setShowEmailModal(false);
+
+        // Trigger download
         handlePdfDownload();
-        posthog.capture('pdf_downloaded', { verified: true, returning_user: false });
     };
 
     const onDownloadClick = () => {
         if (isEmailVerified) {
             handlePdfDownload();
-            posthog.capture('pdf_downloaded', { verified: true, returning_user: true });
         } else {
             setShowEmailModal(true);
-        }
-    };
-
-    const handlePdfDownload = async () => {
-        if (!isUnlocked) return;
-        setIsExporting(true);
-
-        try {
-            const reportElement = document.getElementById('report-content');
-            if (!reportElement) return;
-
-            const canvas = await html2canvas(reportElement, {
-                scale: 2,
-                logging: false,
-                useCORS: true
-            });
-
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-
-            const imgWidth = 210;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-
-            // Add Footer
-            const pageCount = pdf.internal.pages.length - 1; // jsPDF fix
-            pdf.setFontSize(10);
-            pdf.setTextColor(150);
-            pdf.text('This report supports readiness planning only. It does not provide certification or audit results.', 105, 290, { align: 'center' });
-
-            pdf.save('reflecta-readiness-report.pdf');
-
-            posthog.capture('report_exported', {
-                timestamp: new Date().toISOString()
-            });
-        } catch (error) {
-            console.error('Export failed:', error);
-        } finally {
-            setIsExporting(false);
+            posthog.capture('email_modal_shown', { trigger: 'pdf_download' });
         }
     };
 
